@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Schema Rename Script Generator</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">RemanerRenamer</p>
+        <h1 data-i18n="app.title">Schema Rename Script Generator</h1>
+      </div>
+      <div class="header-status" id="headerStatus" aria-live="polite">No files loaded</div>
+    </header>
+
+    <main class="app-shell">
+      <section class="control-panel" aria-label="Rename controls">
+        <div class="tool-section">
+          <div class="section-heading">
+            <h2 data-i18n="folder.title">Folder</h2>
+            <span id="folderSummary">No files loaded</span>
+          </div>
+          <div class="folder-row">
+            <label class="button primary-button" for="folderInput" data-i18n="folder.choose">Choose folder</label>
+            <input id="folderInput" class="visually-hidden" type="file" webkitdirectory directory multiple>
+          </div>
+          <p class="notice" id="folderNotice">Top-level files only in v1.</p>
+        </div>
+
+        <div class="tool-section">
+          <div class="section-heading">
+            <h2 data-i18n="schema.input.title">Input schema</h2>
+          </div>
+          <label class="field-label" for="inputSchema" data-i18n="schema.input.label">Existing filename pattern</label>
+          <input id="inputSchema" class="text-input" type="text" autocomplete="off" spellcheck="false">
+
+          <div class="split-fields">
+            <label class="field-group" for="extensionMode">
+              <span data-i18n="schema.extensionMode">Extension mode</span>
+              <select id="extensionMode">
+                <option value="preserve">Preserve extension</option>
+                <option value="fullFilename">Full filename</option>
+              </select>
+            </label>
+            <label class="field-group" for="caseSensitivity">
+              <span data-i18n="schema.caseSensitivity">Filesystem case</span>
+              <select id="caseSensitivity">
+                <option value="insensitive">Case-insensitive</option>
+                <option value="sensitive">Case-sensitive</option>
+              </select>
+            </label>
+          </div>
+        </div>
+
+        <div class="tool-section">
+          <div class="section-heading">
+            <h2 data-i18n="schema.output.title">Output schema</h2>
+          </div>
+          <label class="field-label" for="outputSchema" data-i18n="schema.output.label">New filename pattern</label>
+          <input id="outputSchema" class="text-input" type="text" autocomplete="off" spellcheck="false">
+          <div class="message-list" id="schemaMessages" aria-live="polite"></div>
+        </div>
+
+        <div class="tool-section">
+          <div class="section-heading">
+            <h2 data-i18n="capture.title">Captured placeholders</h2>
+          </div>
+          <dl class="capture-list" id="capturePreview"></dl>
+        </div>
+
+        <div class="tool-section script-section">
+          <div class="section-heading">
+            <h2 data-i18n="script.title">Script</h2>
+            <span id="scriptSummary">No script generated</span>
+          </div>
+          <div class="button-row">
+            <button id="selectReadyButton" class="button secondary-button" type="button">Select ready</button>
+            <button id="clearSelectionButton" class="button secondary-button" type="button">Clear</button>
+          </div>
+          <div class="button-row">
+            <button id="generateScriptButton" class="button primary-button" type="button" disabled>Generate script</button>
+            <button id="copyScriptButton" class="button secondary-button" type="button" disabled>Copy</button>
+            <button id="downloadScriptButton" class="button secondary-button" type="button" disabled>Download rename.sh</button>
+          </div>
+          <p class="notice strong-notice">Dry-run is the default. The generated script applies changes only with <code>--force</code>.</p>
+          <textarea id="scriptPreview" class="script-preview" readonly spellcheck="false" aria-label="Generated rename script"></textarea>
+        </div>
+      </section>
+
+      <section class="preview-panel" aria-label="Rename preview">
+        <div class="preview-toolbar">
+          <div>
+            <h2 data-i18n="preview.title">Preview</h2>
+            <p id="planSummary">No plan yet</p>
+          </div>
+          <div class="legend" aria-label="Status legend">
+            <span class="status-pill ready">Ready</span>
+            <span class="status-pill blocked">Blocked</span>
+            <span class="status-pill warning">Warning</span>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Use</th>
+                <th scope="col">Status</th>
+                <th scope="col">Old filename</th>
+                <th scope="col">New filename</th>
+                <th scope="col">Captures</th>
+                <th scope="col">Messages</th>
+              </tr>
+            </thead>
+            <tbody id="previewBody">
+              <tr>
+                <td colspan="6">Choose a folder to begin.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>
