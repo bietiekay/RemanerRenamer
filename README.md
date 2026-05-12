@@ -4,6 +4,8 @@ RemanerRenamer is a static browser app for building safe batch rename plans.
 It does not rename files in the browser. It previews filename mappings and
 generates a Bash script that dry-runs by default.
 
+![RemanerRenamer screenshot](screenshot.png)
+
 ## Use
 
 Open `index.html` in a modern browser, or serve the folder locally:
