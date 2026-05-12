@@ -20,7 +20,7 @@
   const DEFAULT_OUTPUT_SCHEMA = "%c%b%a - %title.@ext";
   const SUPPORTED_SYSTEM_VARIABLES = new Set(["ext", "basename", "filename"]);
   const RESERVED_SYSTEM_VARIABLES = new Set(["n"]);
-  const INVALID_FILENAME_CHARS = /[<>:"/\\|?*\u0000-\u001f]/;
+  const INVALID_PATH_SEGMENT_CHARS = /[<>:"\\|?*\u0000-\u001f]/;
   const WINDOWS_RESERVED_NAMES = new Set([
     "CON",
     "PRN",
@@ -299,32 +299,81 @@
     return output;
   }
 
-  function validateFilename(name) {
+  function validatePathSegment(name, label) {
     const errors = [];
     const value = String(name);
 
     if (value.length === 0) {
-      errors.push("Output filename is empty.");
+      errors.push(`${label} is empty.`);
     }
     if (value === "." || value === "..") {
-      errors.push("Output filename cannot be . or ..");
+      errors.push(`${label} cannot be . or ..`);
     }
-    if (INVALID_FILENAME_CHARS.test(value)) {
-      errors.push("Output filename contains characters blocked by strict cross-platform validation.");
+    if (INVALID_PATH_SEGMENT_CHARS.test(value)) {
+      errors.push(`${label} contains characters blocked by strict cross-platform validation.`);
     }
     if (/[ .]$/.test(value)) {
-      errors.push("Output filename cannot end with a space or dot.");
+      errors.push(`${label} cannot end with a space or dot.`);
     }
     if (value.length > 255) {
-      errors.push("Output filename is longer than 255 characters.");
+      errors.push(`${label} is longer than 255 characters.`);
     }
 
     const baseName = value.split(".")[0].replace(/[ .]+$/g, "").toUpperCase();
     if (WINDOWS_RESERVED_NAMES.has(baseName)) {
-      errors.push(`Output filename uses reserved Windows device name: ${baseName}.`);
+      errors.push(`${label} uses reserved Windows device name: ${baseName}.`);
     }
 
     return errors;
+  }
+
+  function validateTargetPath(path) {
+    const errors = [];
+    const value = String(path);
+
+    if (value.length === 0) {
+      return ["Output path is empty."];
+    }
+    if (value.startsWith("/")) {
+      errors.push("Output path must be relative to the selected folder.");
+    }
+    if (value.endsWith("/")) {
+      errors.push("Output path must end with a filename, not a folder.");
+    }
+    if (value.includes("//")) {
+      errors.push("Output path cannot contain empty folder segments.");
+    }
+    if (value.length > 1024) {
+      errors.push("Output path is longer than 1024 characters.");
+    }
+
+    value.split("/").forEach((segment, index, segments) => {
+      const isLast = index === segments.length - 1;
+      const label = isLast ? "Output filename" : "Output folder";
+      errors.push(...validatePathSegment(segment, label));
+    });
+
+    return errors;
+  }
+
+  function validateFilename(name) {
+    const errors = validatePathSegment(name, "Output filename");
+    if (String(name).includes("/")) {
+      errors.push("Output filename cannot contain folder separators.");
+    }
+    return errors;
+  }
+
+  function getTargetDirectory(targetPath) {
+    const value = String(targetPath || "");
+    const slashIndex = value.lastIndexOf("/");
+    return slashIndex === -1 ? "" : value.slice(0, slashIndex);
+  }
+
+  function getTargetFilename(targetPath) {
+    const value = String(targetPath || "");
+    const slashIndex = value.lastIndexOf("/");
+    return slashIndex === -1 ? value : value.slice(slashIndex + 1);
   }
 
   function hasControlCharacters(value) {
@@ -379,12 +428,12 @@
 
       item.matched = true;
       item.captures = match.captures;
-      item.targetName = renderOutput(outputParse.tokens, item.captures, item.systemVariables);
-      item.targetRelativePath = item.targetName;
+      item.targetRelativePath = renderOutput(outputParse.tokens, item.captures, item.systemVariables);
+      item.targetName = getTargetFilename(item.targetRelativePath);
 
-      const filenameErrors = validateFilename(item.targetName);
-      if (filenameErrors.length > 0) {
-        item.errors.push(...filenameErrors);
+      const targetPathErrors = validateTargetPath(item.targetRelativePath);
+      if (targetPathErrors.length > 0) {
+        item.errors.push(...targetPathErrors);
         item.status = "invalidOutput";
       } else {
         item.status = "ready";
@@ -394,7 +443,7 @@
         item.warnings.push("Output does not include @ext.");
       }
 
-      if (item.targetName === item.sourceName) {
+      if (item.targetRelativePath === item.sourceName) {
         item.warnings.push("Target name is unchanged.");
       }
 
@@ -405,7 +454,7 @@
   }
 
   function applyConflictDetection(items, files, caseSensitivity) {
-    const selectedCandidates = items.filter((item) => item.selected && item.matched && item.errors.length === 0 && item.targetName !== null);
+    const selectedCandidates = items.filter((item) => item.selected && item.matched && item.errors.length === 0 && item.targetRelativePath !== null);
     const exactTargetGroups = new Map();
     const foldedTargetGroups = new Map();
     const fileByName = new Map();
@@ -416,12 +465,12 @@
     });
 
     selectedCandidates.forEach((item) => {
-      if (item.targetName !== item.sourceName) {
+      if (item.targetRelativePath !== item.sourceName) {
         movingSourceNames.add(item.sourceName);
       }
 
-      const exactKey = item.targetName;
-      const foldedKey = normalizeCase(item.targetName, "insensitive");
+      const exactKey = item.targetRelativePath;
+      const foldedKey = normalizeCase(item.targetRelativePath, "insensitive");
       if (!exactTargetGroups.has(exactKey)) exactTargetGroups.set(exactKey, []);
       if (!foldedTargetGroups.has(foldedKey)) foldedTargetGroups.set(foldedKey, []);
       exactTargetGroups.get(exactKey).push(item);
@@ -431,7 +480,7 @@
     exactTargetGroups.forEach((group) => {
       if (group.length > 1) {
         group.forEach((item) => {
-          item.errors.push(`Duplicate output target: ${item.targetName}.`);
+          item.errors.push(`Duplicate output target: ${item.targetRelativePath}.`);
           item.status = "conflict";
         });
       }
@@ -439,10 +488,10 @@
 
     if (caseSensitivity === "insensitive") {
       foldedTargetGroups.forEach((group) => {
-        const exactNames = uniqueArray(group.map((item) => item.targetName));
+        const exactNames = uniqueArray(group.map((item) => item.targetRelativePath));
         if (exactNames.length > 1) {
           group.forEach((item) => {
-            item.errors.push(`Case-insensitive duplicate target: ${item.targetName}.`);
+            item.errors.push(`Case-insensitive duplicate target: ${item.targetRelativePath}.`);
             item.status = "conflict";
           });
         }
@@ -452,25 +501,34 @@
     selectedCandidates.forEach((item) => {
       if (item.errors.length > 0) return;
 
-      const existingExact = fileByName.get(item.targetName);
+      const targetDirectory = getTargetDirectory(item.targetRelativePath);
+      const topLevelTargetFolder = targetDirectory.split("/")[0];
+      if (topLevelTargetFolder && fileByName.has(topLevelTargetFolder)) {
+        item.errors.push(`Target folder conflicts with an existing file: ${topLevelTargetFolder}.`);
+        item.status = "wouldOverwrite";
+      }
+
+      const existingExact = targetDirectory ? null : fileByName.get(item.targetRelativePath);
       if (existingExact && existingExact.name !== item.sourceName) {
         if (movingSourceNames.has(existingExact.name)) {
           item.warnings.push("Target is currently another selected source; the script uses temporary names.");
         } else {
-          item.errors.push(`Target already exists in the selected folder: ${item.targetName}.`);
+          item.errors.push(`Target already exists in the selected folder: ${item.targetRelativePath}.`);
           item.status = "wouldOverwrite";
         }
       }
 
       if (caseSensitivity === "insensitive") {
-        const foldedTarget = normalizeCase(item.targetName, "insensitive");
-        const caseMatch = files.find((file) => normalizeCase(file.name, "insensitive") === foldedTarget && file.name !== item.sourceName);
+        const foldedTarget = normalizeCase(item.targetRelativePath, "insensitive");
+        const caseMatch = targetDirectory
+          ? null
+          : files.find((file) => normalizeCase(file.name, "insensitive") === foldedTarget && file.name !== item.sourceName);
         if (caseMatch && !movingSourceNames.has(caseMatch.name)) {
           item.errors.push(`Target conflicts with existing filename by case only: ${caseMatch.name}.`);
           item.status = "wouldOverwrite";
         }
 
-        if (normalizeCase(item.sourceName, "insensitive") === foldedTarget && item.sourceName !== item.targetName) {
+        if (normalizeCase(item.sourceName, "insensitive") === foldedTarget && item.sourceName !== item.targetRelativePath) {
           item.warnings.push("Case-only rename will be applied through a temporary name.");
         }
       }
@@ -561,7 +619,7 @@
     }
 
     const oldNames = items.map((item) => item.sourceName);
-    const newNames = items.map((item) => item.targetName);
+    const newNames = items.map((item) => item.targetRelativePath);
     const oldArray = oldNames.map((name) => `  ${shellQuote(name)}`).join("\n");
     const newArray = newNames.map((name) => `  ${shellQuote(name)}`).join("\n");
     const generatedAt = plan.createdAt || new Date().toISOString();
@@ -640,6 +698,9 @@ validate_plan() {
       exit 1
     fi
 
+    validate_relative_target "$new"
+    validate_target_directory "$new"
+
     if [[ ! -e "$old" ]]; then
       echo "Missing source: $old" >&2
       exit 1
@@ -655,6 +716,67 @@ validate_plan() {
 
     if [[ "$old" != "$new" && -e "$new" ]] && ! is_moving_source "$new"; then
       echo "Target already exists: $new" >&2
+      exit 1
+    fi
+  done
+}
+
+validate_relative_target() {
+  local path="$1" component
+
+  if [[ -z "$path" ]]; then
+    echo "Empty target path." >&2
+    exit 1
+  fi
+  if [[ "$path" == /* ]]; then
+    echo "Target must be relative: $path" >&2
+    exit 1
+  fi
+  if [[ "$path" == */ ]]; then
+    echo "Target must end with a filename: $path" >&2
+    exit 1
+  fi
+  if [[ "$path" == *"//"* ]]; then
+    echo "Target contains an empty folder segment: $path" >&2
+    exit 1
+  fi
+
+  IFS='/' read -ra TARGET_PARTS <<< "$path"
+  for component in "\${TARGET_PARTS[@]}"; do
+    if [[ "$component" == "." || "$component" == ".." ]]; then
+      echo "Target cannot contain . or .. segments: $path" >&2
+      exit 1
+    fi
+  done
+}
+
+target_dir() {
+  local path="$1"
+  if [[ "$path" == */* ]]; then
+    printf '%s\\n' "\${path%/*}"
+  else
+    printf '\\n'
+  fi
+}
+
+validate_target_directory() {
+  local path="$1" dir component prefix
+  dir="$(target_dir "$path")"
+  if [[ -z "$dir" ]]; then
+    return 0
+  fi
+
+  prefix=""
+  IFS='/' read -ra DIR_PARTS <<< "$dir"
+  for component in "\${DIR_PARTS[@]}"; do
+    if [[ -z "$prefix" ]]; then
+      prefix="$component"
+    else
+      prefix="$prefix/$component"
+    fi
+
+    if [[ -e "$prefix" && ! -d "$prefix" ]]; then
+      echo "Target parent is not a directory: $prefix" >&2
       exit 1
     fi
   done
@@ -686,6 +808,17 @@ prepare_temp_names() {
   done
 }
 
+ensure_target_directories() {
+  local i dir
+
+  for ((i = 0; i < COUNT; i++)); do
+    dir="$(target_dir "\${NEW_NAMES[$i]}")"
+    if [[ -n "$dir" ]]; then
+      mkdir -p -- "$dir"
+    fi
+  done
+}
+
 print_header
 print_plan
 echo "Validating..."
@@ -700,6 +833,9 @@ if [[ "$FORCE" != true ]]; then
 fi
 
 prepare_temp_names
+
+echo "Creating target folders..."
+ensure_target_directories
 
 echo "Applying temporary renames..."
 for ((i = 0; i < COUNT; i++)); do
@@ -895,8 +1031,8 @@ echo "Done."
         oldCell.textContent = item.sourceName;
 
         const newCell = doc.createElement("td");
-        newCell.className = item.targetName ? "filename" : "muted";
-        newCell.textContent = item.targetName || "-";
+        newCell.className = item.targetRelativePath ? "filename" : "muted";
+        newCell.textContent = item.targetRelativePath || "-";
 
         const captureCell = doc.createElement("td");
         captureCell.textContent = Object.entries(item.captures)
@@ -1048,6 +1184,7 @@ echo "Done."
     generateRenameScript,
     shellQuote,
     validateFilename,
+    validateTargetPath,
     matchFilename,
     renderOutput
   };

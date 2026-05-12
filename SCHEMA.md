@@ -76,10 +76,33 @@ Input:  %a-%b-%c - %title.mp4
 Output: %title - %a-%b-%c.mp4
 ```
 
+## Folder Output
+
+Output schemas may include `/` separators to create a relative folder structure
+from captured placeholders and system variables.
+
+```text
+Input:  %a-%b-%d - %t
+Output: %a/%d/%t.@ext
+```
+
+The generated script writes `%t.@ext` into the folder `%d` under the folder
+`%a`, relative to the selected folder. Missing folders are created by the script
+when it runs with `--force`.
+
+Folder output is transparent: no separate toggle is needed. It activates when
+the rendered output path contains `/`.
+
+Safety rules:
+
+- paths must be relative
+- empty path segments are blocked
+- `.` and `..` path segments are blocked
+- every folder and filename segment uses strict cross-platform validation
+
 ## Limits
 
 - Adjacent input placeholders such as `%a%b` are blocked because the split point
   is ambiguous.
 - Repeated placeholders are allowed only when repeated captures are identical.
-- Output schemas cannot create subfolders in v1.
 - Recursive folder renaming is deferred.

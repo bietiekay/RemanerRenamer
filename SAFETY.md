@@ -35,10 +35,21 @@ Before applying, the script checks:
 - source and target names are not empty
 - targets are unique
 - existing targets are not overwritten unless they are selected moving sources
+- target folders are valid relative paths
+- existing target parents are directories
 - temporary names are available
 
 The app also blocks unsafe output names with strict cross-platform filename
 validation.
+
+## Folder Creation
+
+When an output schema contains `/`, the rendered target becomes a relative path.
+The script creates missing target folders with `mkdir -p` only in `--force`
+mode, after validation and before file moves.
+
+Absolute paths, empty folder segments, `.` segments, and `..` segments are
+blocked.
 
 ## Temporary Rename Strategy
 

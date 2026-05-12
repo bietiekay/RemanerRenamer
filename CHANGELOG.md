@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- Folder output paths in output schemas using `/`, with generated `mkdir -p`
+  support for missing folders.
 - Static browser UI for folder selection, schema entry, preview, and script export.
 - Schema parser for user placeholders, escaped percent signs, and output system variables.
 - Rename planner with strict filename validation, conflict detection, and selectable rows.

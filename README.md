@@ -55,6 +55,20 @@ Result:
 01052026 - Das ist ein.mp4
 ```
 
+Output schemas can also include folders. A `/` separator makes the generated
+script place the file in a relative folder path and create folders as needed
+when run with `--force`:
+
+```text
+%a/%c%b%a/%title.@ext
+```
+
+Result:
+
+```text
+2026/01052026/Das ist ein.mp4
+```
+
 ## Development
 
 No build step or package install is required.
@@ -69,6 +83,7 @@ node tests/logic.test.js
 
 - The browser app never writes to the filesystem.
 - The generated script validates sources and targets before applying.
+- The generated script creates target folders when output schemas contain `/`.
 - The generated script does not silently overwrite targets.
 - Real renames happen only with `--force`.
 

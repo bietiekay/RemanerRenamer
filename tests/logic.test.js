@@ -7,7 +7,8 @@ const {
   generateRenameScript,
   shellQuote,
   tokenizeSchema,
-  validateFilename
+  validateFilename,
+  validateTargetPath
 } = require("../app.js");
 
 function planFor(names, options = {}) {
@@ -80,11 +81,22 @@ function planFor(names, options = {}) {
 }
 
 {
-  assert.deepEqual(validateFilename("bad/name.mp4"), [
-    "Output filename contains characters blocked by strict cross-platform validation."
-  ]);
+  assert.deepEqual(validateTargetPath("artist/date/title.mp4"), []);
+  assert.ok(validateTargetPath("/artist/date/title.mp4").some((error) => error.includes("relative")));
+  assert.ok(validateTargetPath("artist/../title.mp4").some((error) => error.includes(". or ..")));
+  assert.ok(validateTargetPath("artist/CON/title.mp4").some((error) => error.includes("reserved Windows")));
+  assert.ok(validateFilename("bad/name.mp4").some((error) => error.includes("folder separators")));
   assert.ok(validateFilename("CON.txt").some((error) => error.includes("reserved Windows")));
   assert.ok(validateFilename("name.").some((error) => error.includes("space or dot")));
+}
+
+{
+  const plan = planFor(["2026-05-01 - Das ist ein - Test.mp4"], {
+    outputSchema: "%a/%c%b%a/%title.@ext"
+  });
+  assert.equal(plan.validation.canGenerateScript, true);
+  assert.equal(plan.items[0].targetName, "Das ist ein.mp4");
+  assert.equal(plan.items[0].targetRelativePath, "2026/01052026/Das ist ein.mp4");
 }
 
 {
@@ -114,6 +126,7 @@ function planFor(names, options = {}) {
   const script = generateRenameScript(plan);
   assert.match(script, /--force/);
   assert.match(script, /Mode: DRY RUN/);
+  assert.match(script, /mkdir -p --/);
   assert.match(script, /mv --/);
   assert.match(script, /\.rename_tmp_/);
   assert.equal(shellQuote("John's File.mp4"), "'John'\\''s File.mp4'");
