@@ -266,6 +266,63 @@ select:focus,
   color: var(--info);
 }
 
+.replacement-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.replacement-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.replacement-toggle {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.replacement-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 9px;
+  background: #fff;
+  color: var(--text);
+}
+
+.replacement-input:focus {
+  outline: 3px solid var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.replacement-empty {
+  padding: 10px 12px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  background: #fff;
+}
+
+.mini-button {
+  min-width: 42px;
+  min-height: 34px;
+  padding: 6px 8px;
+  font-size: 0.82rem;
+}
+
 .capture-list {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
@@ -444,5 +501,9 @@ tbody tr.row-blocked {
   .folder-row label,
   .button-row button {
     width: 100%;
+  }
+
+  .replacement-row {
+    grid-template-columns: 1fr;
   }
 }

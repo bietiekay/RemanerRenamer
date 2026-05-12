@@ -42,6 +42,15 @@ Before applying, the script checks:
 The app also blocks unsafe output names with strict cross-platform filename
 validation.
 
+## Replacements
+
+Replacement rules are applied in the browser after output rendering and before
+target validation. The preview, conflict detector, and generated script all use
+the final replaced paths.
+
+Rules run on each path segment separately, so replacement text containing `/` is
+blocked. This keeps folder structure controlled by the output schema.
+
 ## Folder Creation
 
 When an output schema contains `/`, the rendered target becomes a relative path.

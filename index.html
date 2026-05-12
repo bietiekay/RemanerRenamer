@@ -65,6 +65,19 @@
 
         <div class="tool-section">
           <div class="section-heading">
+            <h2 data-i18n="replacements.title">Replacements</h2>
+            <span id="replacementSummary">No rules</span>
+          </div>
+          <div class="replacement-list" id="replacementRulesList" aria-live="polite"></div>
+          <div class="button-row">
+            <button id="addReplacementButton" class="button secondary-button" type="button">Add rule</button>
+            <button id="clearReplacementsButton" class="button secondary-button" type="button">Clear rules</button>
+          </div>
+          <p class="notice">Rules run after the output schema, one path segment at a time.</p>
+        </div>
+
+        <div class="tool-section">
+          <div class="section-heading">
             <h2 data-i18n="capture.title">Captured placeholders</h2>
           </div>
           <dl class="capture-list" id="capturePreview"></dl>

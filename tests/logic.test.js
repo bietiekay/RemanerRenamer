@@ -2,12 +2,15 @@ const assert = require("node:assert/strict");
 const {
   DEFAULT_INPUT_SCHEMA,
   DEFAULT_OUTPUT_SCHEMA,
+  applyReplacementRulesToSegment,
+  applyReplacementRulesToTargetPath,
   createFileEntryFromName,
   createRenamePlan,
   generateRenameScript,
   shellQuote,
   tokenizeSchema,
   validateFilename,
+  validateReplacementRules,
   validateTargetPath
 } = require("../app.js");
 
@@ -17,7 +20,8 @@ function planFor(names, options = {}) {
     inputSchema: options.inputSchema || DEFAULT_INPUT_SCHEMA,
     outputSchema: options.outputSchema || DEFAULT_OUTPUT_SCHEMA,
     extensionMode: options.extensionMode || "preserve",
-    caseSensitivity: options.caseSensitivity || "insensitive"
+    caseSensitivity: options.caseSensitivity || "insensitive",
+    replacements: options.replacements || []
   });
 }
 
@@ -78,6 +82,71 @@ function planFor(names, options = {}) {
   });
   assert.equal(plan.validation.canGenerateScript, false);
   assert.match(plan.validation.schemaErrors.join(" "), /unknown placeholder/);
+}
+
+{
+  const rules = [
+    { enabled: true, find: "&", replace: "and" },
+    { enabled: true, find: "and", replace: "+" }
+  ];
+  assert.equal(applyReplacementRulesToSegment("A & B", rules), "A + B");
+}
+
+{
+  const rules = [{ enabled: true, find: " ", replace: "_" }];
+  assert.equal(applyReplacementRulesToTargetPath("A B/C D.mp4", rules), "A_B/C_D.mp4");
+}
+
+{
+  const rules = [{ enabled: true, find: " copy", replace: "" }];
+  assert.equal(applyReplacementRulesToTargetPath("Album/Song copy.mp4", rules), "Album/Song.mp4");
+}
+
+{
+  const validation = validateReplacementRules([{ enabled: true, find: "", replace: "x" }]);
+  assert.ok(validation.errors.some((error) => error.includes("empty find")));
+}
+
+{
+  const validation = validateReplacementRules([{ enabled: false, find: "", replace: "/" }]);
+  assert.equal(validation.errors.length, 0);
+}
+
+{
+  const validation = validateReplacementRules([{ enabled: true, find: "x", replace: "a/b" }]);
+  assert.ok(validation.errors.some((error) => error.includes("cannot contain /")));
+}
+
+{
+  const plan = planFor(["Artist - Song: Part.mp4"], {
+    inputSchema: "%artist - %title",
+    outputSchema: "%artist/%title.@ext",
+    replacements: [{ enabled: true, find: ":", replace: "-" }]
+  });
+  assert.equal(plan.validation.canGenerateScript, true);
+  assert.equal(plan.items[0].rawTargetRelativePath, "Artist/Song: Part.mp4");
+  assert.equal(plan.items[0].targetRelativePath, "Artist/Song- Part.mp4");
+}
+
+{
+  const plan = planFor(["Artist - Song: Part.mp4"], {
+    inputSchema: "%artist - %title",
+    outputSchema: "%artist/%title.@ext",
+    replacements: [{ enabled: true, find: ":", replace: "/" }]
+  });
+  assert.equal(plan.validation.canGenerateScript, false);
+  assert.match(plan.validation.schemaErrors.join(" "), /cannot contain \//);
+}
+
+{
+  const plan = planFor(["Artist - Song: Part.mp4"], {
+    inputSchema: "%artist - %title",
+    outputSchema: "%artist/%title.@ext",
+    replacements: [{ enabled: true, find: ":", replace: "-" }]
+  });
+  const script = generateRenameScript(plan);
+  assert.match(script, /'Artist\/Song- Part\.mp4'/);
+  assert.doesNotMatch(script, /Artist\/Song: Part\.mp4/);
 }
 
 {

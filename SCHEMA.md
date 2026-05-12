@@ -100,6 +100,39 @@ Safety rules:
 - `.` and `..` path segments are blocked
 - every folder and filename segment uses strict cross-platform validation
 
+## Replacements
+
+Replacement rules are optional literal substring replacements that run after the
+output schema renders and before validation, conflict detection, preview, and
+script generation.
+
+Rules are saved in the browser and applied top-to-bottom. Matching is
+case-sensitive.
+
+Example rules:
+
+```text
+& -> and
+: -> -
+```
+
+Rendered output:
+
+```text
+AC DC/2026/One & Two: Test.mp4
+```
+
+Final output:
+
+```text
+AC DC/2026/One and Two- Test.mp4
+```
+
+Replacements run on each path segment separately. They can change folder names
+and filenames, but they cannot create or remove `/` folder separators. Empty
+replacement text is allowed for deleting text. Enabled rules with an empty find
+value are invalid.
+
 ## Limits
 
 - Adjacent input placeholders such as `%a%b` are blocked because the split point

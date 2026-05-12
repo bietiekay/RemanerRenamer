@@ -11,6 +11,7 @@
     "schema.output.label": "New filename pattern",
     "schema.extensionMode": "Extension mode",
     "schema.caseSensitivity": "Filesystem case",
+    "replacements.title": "Replacements",
     "capture.title": "Captured placeholders",
     "script.title": "Script",
     "preview.title": "Preview"
@@ -18,6 +19,7 @@
 
   const DEFAULT_INPUT_SCHEMA = "%a-%b-%c - %title - %suffix";
   const DEFAULT_OUTPUT_SCHEMA = "%c%b%a - %title.@ext";
+  const REPLACEMENT_STORAGE_KEY = "remanerRenamer.replacements.v1";
   const SUPPORTED_SYSTEM_VARIABLES = new Set(["ext", "basename", "filename"]);
   const RESERVED_SYSTEM_VARIABLES = new Set(["n"]);
   const INVALID_PATH_SEGMENT_CHARS = /[<>:"\\|?*\u0000-\u001f]/;
@@ -299,6 +301,51 @@
     return output;
   }
 
+  function normalizeReplacementRule(rule, index = 0) {
+    return {
+      id: String(rule && rule.id ? rule.id : `rule-${index}`),
+      enabled: !(rule && rule.enabled === false),
+      find: String(rule && rule.find !== undefined ? rule.find : ""),
+      replace: String(rule && rule.replace !== undefined ? rule.replace : "")
+    };
+  }
+
+  function normalizeReplacementRules(rules) {
+    if (!Array.isArray(rules)) return [];
+    return rules.map((rule, index) => normalizeReplacementRule(rule, index));
+  }
+
+  function validateReplacementRules(rules) {
+    const errors = [];
+    normalizeReplacementRules(rules).forEach((rule, index) => {
+      if (!rule.enabled) return;
+      const label = `Replacement rule ${index + 1}`;
+      if (rule.find.length === 0) {
+        errors.push(`${label} has an empty find value.`);
+      }
+      if (rule.replace.includes("/")) {
+        errors.push(`${label} replacement text cannot contain / because folder structure comes from the output schema.`);
+      }
+    });
+    return { errors };
+  }
+
+  function applyReplacementRulesToSegment(value, rules) {
+    return normalizeReplacementRules(rules).reduce((result, rule) => {
+      if (!rule.enabled || rule.find.length === 0 || rule.replace.includes("/")) {
+        return result;
+      }
+      return result.split(rule.find).join(rule.replace);
+    }, String(value));
+  }
+
+  function applyReplacementRulesToTargetPath(path, rules) {
+    return String(path)
+      .split("/")
+      .map((segment) => applyReplacementRulesToSegment(segment, rules))
+      .join("/");
+  }
+
   function validatePathSegment(name, label) {
     const errors = [];
     const value = String(name);
@@ -386,6 +433,7 @@
 
   function createBasePlanItems(files, inputParse, outputParse, request, schemaErrors) {
     const items = [];
+    const replacements = normalizeReplacementRules(request.replacements);
 
     files.forEach((file) => {
       const selected = file.selected !== false;
@@ -395,6 +443,7 @@
         sourceName: file.name,
         sourceRelativePath: file.name,
         targetName: null,
+        rawTargetRelativePath: null,
         targetRelativePath: null,
         matched: false,
         captures: {},
@@ -428,7 +477,8 @@
 
       item.matched = true;
       item.captures = match.captures;
-      item.targetRelativePath = renderOutput(outputParse.tokens, item.captures, item.systemVariables);
+      item.rawTargetRelativePath = renderOutput(outputParse.tokens, item.captures, item.systemVariables);
+      item.targetRelativePath = applyReplacementRulesToTargetPath(item.rawTargetRelativePath, replacements);
       item.targetName = getTargetFilename(item.targetRelativePath);
 
       const targetPathErrors = validateTargetPath(item.targetRelativePath);
@@ -566,6 +616,7 @@
     const outputSchema = request.outputSchema || "";
     const extensionMode = request.extensionMode || "preserve";
     const caseSensitivity = request.caseSensitivity || "insensitive";
+    const replacements = normalizeReplacementRules(request.replacements);
 
     const inputParse = tokenizeSchema(inputSchema, {
       allowSystemVariables: false,
@@ -576,10 +627,12 @@
       blockAdjacentPlaceholders: false
     });
     const outputValidation = validateOutputSchema(outputParse, inputParse.placeholders, { extensionMode });
+    const replacementValidation = validateReplacementRules(replacements);
     const schemaErrors = [
       ...inputParse.errors.map((error) => `Input schema: ${error}`),
       ...outputParse.errors.map((error) => `Output schema: ${error}`),
-      ...outputValidation.errors
+      ...outputValidation.errors,
+      ...replacementValidation.errors
     ];
     const schemaWarnings = outputValidation.warnings;
 
@@ -590,7 +643,7 @@
       schemaErrors.push("Output schema is required.");
     }
 
-    const items = createBasePlanItems(files, inputParse, outputParse, { extensionMode }, schemaErrors);
+    const items = createBasePlanItems(files, inputParse, outputParse, { extensionMode, replacements }, schemaErrors);
     if (schemaErrors.length === 0) {
       applyConflictDetection(items, files, caseSensitivity);
     }
@@ -599,6 +652,7 @@
       createdAt: new Date().toISOString(),
       inputSchema,
       outputSchema,
+      replacements,
       extensionMode,
       caseSensitivity,
       items,
@@ -885,7 +939,43 @@ echo "Done."
     return `${value.toFixed(value >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
   }
 
+  function createReplacementRule() {
+    return {
+      id: `rule-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      enabled: true,
+      find: "",
+      replace: ""
+    };
+  }
+
+  function loadReplacementRules(storage) {
+    if (!storage) return [];
+    try {
+      return normalizeReplacementRules(JSON.parse(storage.getItem(REPLACEMENT_STORAGE_KEY) || "[]"));
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function saveReplacementRules(storage, rules) {
+    if (!storage) return;
+    try {
+      storage.setItem(REPLACEMENT_STORAGE_KEY, JSON.stringify(normalizeReplacementRules(rules)));
+    } catch (error) {
+      // Ignore storage errors; replacement rules still work for the current session.
+    }
+  }
+
+  function getLocalStorage(doc) {
+    try {
+      return doc.defaultView ? doc.defaultView.localStorage : null;
+    } catch (error) {
+      return null;
+    }
+  }
+
   function initApp(doc) {
+    const storage = getLocalStorage(doc);
     const state = {
       files: [],
       ignoredNestedCount: 0,
@@ -893,6 +983,7 @@ echo "Done."
       outputSchema: DEFAULT_OUTPUT_SCHEMA,
       extensionMode: "preserve",
       caseSensitivity: "insensitive",
+      replacements: loadReplacementRules(storage),
       selectedIds: new Set(),
       lastScript: ""
     };
@@ -907,6 +998,10 @@ echo "Done."
       extensionMode: doc.getElementById("extensionMode"),
       caseSensitivity: doc.getElementById("caseSensitivity"),
       schemaMessages: doc.getElementById("schemaMessages"),
+      replacementSummary: doc.getElementById("replacementSummary"),
+      replacementRulesList: doc.getElementById("replacementRulesList"),
+      addReplacementButton: doc.getElementById("addReplacementButton"),
+      clearReplacementsButton: doc.getElementById("clearReplacementsButton"),
       capturePreview: doc.getElementById("capturePreview"),
       previewBody: doc.getElementById("previewBody"),
       planSummary: doc.getElementById("planSummary"),
@@ -933,7 +1028,8 @@ echo "Done."
         inputSchema: state.inputSchema,
         outputSchema: state.outputSchema,
         extensionMode: state.extensionMode,
-        caseSensitivity: state.caseSensitivity
+        caseSensitivity: state.caseSensitivity,
+        replacements: state.replacements
       });
     }
 
@@ -952,7 +1048,7 @@ echo "Done."
       if (messages.length === 0) {
         const node = doc.createElement("div");
         node.className = "message info";
-        node.textContent = "Schemas are valid.";
+        node.textContent = "Schemas and replacements are valid.";
         els.schemaMessages.appendChild(node);
         return;
       }
@@ -991,6 +1087,71 @@ echo "Done."
         dt.textContent = `@${name}`;
         dd.textContent = value || "(empty)";
         els.capturePreview.append(dt, dd);
+      });
+    }
+
+    function renderReplacementRules() {
+      els.replacementRulesList.innerHTML = "";
+
+      if (state.replacements.length === 0) {
+        const empty = doc.createElement("div");
+        empty.className = "replacement-empty";
+        empty.textContent = "No replacement rules yet.";
+        els.replacementRulesList.appendChild(empty);
+        return;
+      }
+
+      state.replacements.forEach((rule, index) => {
+        const row = doc.createElement("div");
+        row.className = "replacement-row";
+        row.setAttribute("data-rule-id", rule.id);
+
+        const toggleLabel = doc.createElement("label");
+        toggleLabel.className = "replacement-toggle";
+        const toggle = doc.createElement("input");
+        toggle.type = "checkbox";
+        toggle.checked = rule.enabled;
+        toggle.setAttribute("data-action", "toggle");
+        toggleLabel.append(toggle, doc.createTextNode("On"));
+
+        const findInput = doc.createElement("input");
+        findInput.className = "replacement-input";
+        findInput.type = "text";
+        findInput.placeholder = "Find";
+        findInput.value = rule.find;
+        findInput.setAttribute("data-field", "find");
+        findInput.setAttribute("aria-label", `Find text for replacement rule ${index + 1}`);
+
+        const replaceInput = doc.createElement("input");
+        replaceInput.className = "replacement-input";
+        replaceInput.type = "text";
+        replaceInput.placeholder = "Replace";
+        replaceInput.value = rule.replace;
+        replaceInput.setAttribute("data-field", "replace");
+        replaceInput.setAttribute("aria-label", `Replacement text for rule ${index + 1}`);
+
+        const upButton = doc.createElement("button");
+        upButton.className = "button secondary-button mini-button";
+        upButton.type = "button";
+        upButton.textContent = "Up";
+        upButton.disabled = index === 0;
+        upButton.setAttribute("data-action", "up");
+
+        const downButton = doc.createElement("button");
+        downButton.className = "button secondary-button mini-button";
+        downButton.type = "button";
+        downButton.textContent = "Down";
+        downButton.disabled = index === state.replacements.length - 1;
+        downButton.setAttribute("data-action", "down");
+
+        const deleteButton = doc.createElement("button");
+        deleteButton.className = "button secondary-button mini-button";
+        deleteButton.type = "button";
+        deleteButton.textContent = "Delete";
+        deleteButton.setAttribute("data-action", "delete");
+
+        row.append(toggleLabel, findInput, replaceInput, upButton, downButton, deleteButton);
+        els.replacementRulesList.appendChild(row);
       });
     }
 
@@ -1058,6 +1219,8 @@ echo "Done."
         : "Top-level files only in v1.";
       els.planSummary.textContent = `${plan.validation.readyFiles} ready, ${plan.validation.unmatchedFiles} unmatched, ${plan.validation.conflictedFiles + plan.validation.invalidFiles} blocked, ${plan.validation.selectedFiles} selected.`;
       els.scriptSummary.textContent = state.lastScript ? `${getScriptItems(plan).length} rename pair${getScriptItems(plan).length === 1 ? "" : "s"} in script` : "No script generated";
+      const enabledCount = state.replacements.filter((rule) => rule.enabled).length;
+      els.replacementSummary.textContent = `${enabledCount} enabled / ${state.replacements.length} total`;
     }
 
     function renderControls(plan) {
@@ -1066,11 +1229,16 @@ echo "Done."
       els.downloadScriptButton.disabled = !state.lastScript;
       els.selectReadyButton.disabled = plan.items.length === 0;
       els.clearSelectionButton.disabled = state.selectedIds.size === 0;
+      els.clearReplacementsButton.disabled = state.replacements.length === 0;
     }
 
-    function render() {
+    function render(options = {}) {
+      const shouldRenderReplacementRules = options.renderReplacementRules !== false;
       const plan = getCurrentPlan();
       renderMessages(plan);
+      if (shouldRenderReplacementRules) {
+        renderReplacementRules();
+      }
       renderCaptures(plan);
       renderPreview(plan);
       renderSummaries(plan);
@@ -1095,6 +1263,63 @@ echo "Done."
       state.files = topLevelFiles;
       state.ignoredNestedCount = ignoredNestedCount;
       state.selectedIds = new Set(topLevelFiles.map((file) => file.id));
+      clearGeneratedScript();
+      render();
+    });
+
+    els.replacementRulesList.addEventListener("input", (event) => {
+      const field = event.target.getAttribute("data-field");
+      if (!field) return;
+      const row = event.target.closest("[data-rule-id]");
+      const rule = state.replacements.find((candidate) => candidate.id === row.getAttribute("data-rule-id"));
+      if (!rule) return;
+      rule[field] = event.target.value;
+      saveReplacementRules(storage, state.replacements);
+      clearGeneratedScript();
+      render({ renderReplacementRules: false });
+    });
+
+    els.replacementRulesList.addEventListener("change", (event) => {
+      if (event.target.getAttribute("data-action") !== "toggle") return;
+      const row = event.target.closest("[data-rule-id]");
+      const rule = state.replacements.find((candidate) => candidate.id === row.getAttribute("data-rule-id"));
+      if (!rule) return;
+      rule.enabled = event.target.checked;
+      saveReplacementRules(storage, state.replacements);
+      clearGeneratedScript();
+      render({ renderReplacementRules: false });
+    });
+
+    els.replacementRulesList.addEventListener("click", (event) => {
+      const action = event.target.getAttribute("data-action");
+      if (!action || action === "toggle") return;
+      const row = event.target.closest("[data-rule-id]");
+      const index = state.replacements.findIndex((candidate) => candidate.id === row.getAttribute("data-rule-id"));
+      if (index === -1) return;
+
+      if (action === "up" && index > 0) {
+        [state.replacements[index - 1], state.replacements[index]] = [state.replacements[index], state.replacements[index - 1]];
+      } else if (action === "down" && index < state.replacements.length - 1) {
+        [state.replacements[index + 1], state.replacements[index]] = [state.replacements[index], state.replacements[index + 1]];
+      } else if (action === "delete") {
+        state.replacements.splice(index, 1);
+      }
+
+      saveReplacementRules(storage, state.replacements);
+      clearGeneratedScript();
+      render();
+    });
+
+    els.addReplacementButton.addEventListener("click", () => {
+      state.replacements.push(createReplacementRule());
+      saveReplacementRules(storage, state.replacements);
+      clearGeneratedScript();
+      render();
+    });
+
+    els.clearReplacementsButton.addEventListener("click", () => {
+      state.replacements = [];
+      saveReplacementRules(storage, state.replacements);
       clearGeneratedScript();
       render();
     });
@@ -1177,6 +1402,7 @@ echo "Done."
     DEFAULT_OUTPUT_SCHEMA,
     tokenizeSchema,
     validateOutputSchema,
+    validateReplacementRules,
     splitExtension,
     createFileEntryFromName,
     createRenamePlan,
@@ -1185,6 +1411,8 @@ echo "Done."
     shellQuote,
     validateFilename,
     validateTargetPath,
+    applyReplacementRulesToSegment,
+    applyReplacementRulesToTargetPath,
     matchFilename,
     renderOutput
   };

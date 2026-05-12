@@ -14,6 +14,12 @@ python3 -m http.server 8080
 
 Then open `http://localhost:8080`.
 
+The repository also includes a helper script for the same local server:
+
+```bash
+./start-server.sh
+```
+
 1. Choose a folder.
 2. Enter an input schema for current filenames.
 3. Review captured placeholders.
@@ -69,9 +75,26 @@ Result:
 2026/01052026/Das ist ein.mp4
 ```
 
+Replacement rules can clean rendered output before validation and script
+generation. For example, add rules like:
+
+```text
+& -> and
+: -> -
+```
+
+These rules run after the output schema, from top to bottom, on each folder or
+filename segment. The generated script receives the final previewed paths only.
+
 ## Development
 
 No build step or package install is required.
+
+Start a local static server with:
+
+```bash
+./start-server.sh
+```
 
 Run the logic tests with:
 
@@ -84,6 +107,7 @@ node tests/logic.test.js
 - The browser app never writes to the filesystem.
 - The generated script validates sources and targets before applying.
 - The generated script creates target folders when output schemas contain `/`.
+- Replacement rules are previewed and validated before script generation.
 - The generated script does not silently overwrite targets.
 - Real renames happen only with `--force`.
 
