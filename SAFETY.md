@@ -7,6 +7,9 @@ RemanerRenamer is a rename-plan generator, not a direct renaming tool.
 The app reads filenames through the browser folder picker. It does not request
 filesystem write access and does not rename files directly.
 
+No file contents or rename data are uploaded to a server, processed remotely, or
+stored on a server. The app handles filenames locally in the browser.
+
 The browser usually does not expose the selected folder's absolute path, so the
 generated script uses relative filenames and assumes it is run from the target
 folder.

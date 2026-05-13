@@ -110,6 +110,8 @@ node tests/logic.test.js
 
 ## Safety
 
+- No file contents or rename data are uploaded to a server, processed remotely,
+  or stored on a server. The app handles filenames locally in the browser.
 - The browser app never writes to the filesystem.
 - The generated script validates sources and targets before applying.
 - The generated script creates target folders when output schemas contain `/`.

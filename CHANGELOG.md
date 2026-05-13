@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Added
+- In-app and documented privacy notice that filenames are handled locally in the
+  browser and no data is uploaded to, processed by, or stored on a server.
 - Browser-saved replacement rules that run after output rendering and before
   validation, preview, and script generation.
 - Character replacement implementation plan document.
