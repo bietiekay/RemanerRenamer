@@ -6,6 +6,10 @@ generates a Bash script that dry-runs by default.
 
 ![RemanerRenamer screenshot](screenshot.png)
 
+## Demo
+
+The public demo is available at https://schrankmonster.de/renamer/.
+
 ## Use
 
 Open `index.html` in a modern browser, or serve the folder locally:
