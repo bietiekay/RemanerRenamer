@@ -46,6 +46,47 @@ function planFor(names, options = {}) {
 }
 
 {
+  const parsed = tokenizeSchema("%{a}__(S%{b}_E%{c})%{y}", {
+    allowSystemVariables: false,
+    blockAdjacentPlaceholders: true
+  });
+  assert.equal(parsed.errors.length, 0);
+  assert.deepEqual(parsed.tokens, [
+    { type: "placeholder", name: "a" },
+    { type: "literal", value: "__(S" },
+    { type: "placeholder", name: "b" },
+    { type: "literal", value: "_E" },
+    { type: "placeholder", name: "c" },
+    { type: "literal", value: ")" },
+    { type: "placeholder", name: "y" }
+  ]);
+}
+
+{
+  const parsed = tokenizeSchema("S%{b}E%{c}.@{ext}", {
+    allowSystemVariables: true,
+    blockAdjacentPlaceholders: false
+  });
+  assert.equal(parsed.errors.length, 0);
+  assert.deepEqual(parsed.tokens, [
+    { type: "literal", value: "S" },
+    { type: "placeholder", name: "b" },
+    { type: "literal", value: "E" },
+    { type: "placeholder", name: "c" },
+    { type: "literal", value: "." },
+    { type: "systemVariable", name: "ext" }
+  ]);
+}
+
+{
+  const parsed = tokenizeSchema("%{a}%{b}", {
+    allowSystemVariables: false,
+    blockAdjacentPlaceholders: true
+  });
+  assert.equal(parsed.errors.length, 1);
+}
+
+{
   const plan = planFor(["2026-05-01 - Das ist ein - Test.mp4"]);
   assert.equal(plan.validation.canGenerateScript, true);
   assert.equal(plan.items[0].targetName, "01052026 - Das ist ein.mp4");
@@ -55,6 +96,21 @@ function planFor(names, options = {}) {
     c: "01",
     title: "Das ist ein",
     suffix: "Test"
+  });
+}
+
+{
+  const plan = planFor(["Mittendrin_-_Flughafen_Frankfurt-100_Jahre_Lufthansa__Propeller,_Piloten_und_Pillbox__(S16_E05)-0168821512.mp4"], {
+    inputSchema: "%{a}__(S%{b}_E%{c})%{y}",
+    outputSchema: "S%{b}E%{c}.@ext"
+  });
+  assert.equal(plan.validation.canGenerateScript, true);
+  assert.equal(plan.items[0].targetName, "S16E05.mp4");
+  assert.deepEqual(plan.items[0].captures, {
+    a: "Mittendrin_-_Flughafen_Frankfurt-100_Jahre_Lufthansa__Propeller,_Piloten_und_Pillbox",
+    b: "16",
+    c: "05",
+    y: "-0168821512"
   });
 }
 

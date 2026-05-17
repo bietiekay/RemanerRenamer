@@ -41,7 +41,13 @@ bash rename.sh
 bash rename.sh --force
 ```
 
-## Example
+## Examples
+
+Placeholders can be written as `%name` or `%{name}`. Use the braced form when
+literal text immediately after the placeholder starts with a letter, number, or
+underscore.
+
+### Date parts
 
 Filename:
 
@@ -52,13 +58,13 @@ Filename:
 Input schema:
 
 ```text
-%a-%b-%c - %title - %suffix
+%{a}-%{b}-%{c} - %{title} - %{suffix}
 ```
 
 Output schema:
 
 ```text
-%c%b%a - %title.@ext
+%{c}%{b}%{a} - %{title}.@ext
 ```
 
 Result:
@@ -67,12 +73,51 @@ Result:
 01052026 - Das ist ein.mp4
 ```
 
+The older unbraced form also works here because every input placeholder is
+followed by a clear literal separator:
+
+```text
+Input:  %a-%b-%c - %title - %suffix
+Output: %c%b%a - %title.@ext
+```
+
+### Delimited episode code
+
+Filename:
+
+```text
+Mittendrin_-_Flughafen_Frankfurt-100_Jahre_Lufthansa__Propeller,_Piloten_und_Pillbox__(S16_E05)-0168821512.mp4
+```
+
+Input schema:
+
+```text
+%{title}__(S%{season}_E%{episode})%{id}
+```
+
+Output schema:
+
+```text
+S%{season}E%{episode}.@ext
+```
+
+Result:
+
+```text
+S16E05.mp4
+```
+
+Without braces, `%title__`, `%season_E`, or `%seasonE` would be read as whole
+placeholder names. Braces make the intended split explicit.
+
+### Folder output
+
 Output schemas can also include folders. A `/` separator makes the generated
 script place the file in a relative folder path and create folders as needed
 when run with `--force`:
 
 ```text
-%a/%c%b%a/%title.@ext
+%{a}/%{c}%{b}%{a}/%{title}.@ext
 ```
 
 Result:
@@ -80,6 +125,43 @@ Result:
 ```text
 2026/01052026/Das ist ein.mp4
 ```
+
+### Full filename mode
+
+Preserve extension mode matches only the basename. Full filename mode matches
+the complete filename, including the extension.
+
+Filename:
+
+```text
+Interview.2026.mp4
+```
+
+Extension mode:
+
+```text
+Full filename
+```
+
+Input schema:
+
+```text
+%{title}.%{year}.mp4
+```
+
+Output schema:
+
+```text
+%{year} - %{title}.@ext
+```
+
+Result:
+
+```text
+2026 - Interview.mp4
+```
+
+### Replacement rules
 
 Replacement rules can clean rendered output before validation and script
 generation. For example, add rules like:

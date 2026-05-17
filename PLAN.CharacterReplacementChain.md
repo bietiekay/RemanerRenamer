@@ -4,7 +4,7 @@
 Add a user-maintained replacement list that runs after the output schema renders and before validation, conflict detection, preview, and script generation. Replacements are literal, ordered, case-sensitive substring rules saved in the browser. They apply to each rendered path segment, so folder separators from `/` are preserved and cannot be created or removed by replacement rules.
 
 ## Concept
-- The output schema remains responsible for structure: `%a/%d/%t.@ext`.
+- The output schema remains responsible for structure: `%{a}/%{d}/%{t}.@ext`.
 - Replacement rules clean or normalize the rendered text as the final browser-side transformation:
   - render output schema
   - split rendered target path by `/`
@@ -12,7 +12,7 @@ Add a user-maintained replacement list that runs after the output schema renders
   - rejoin with `/`
   - validate final target path
 - Example:
-  - output schema: `%a/%d/%t.@ext`
+  - output schema: `%{a}/%{d}/%{t}.@ext`
   - rules: `& -> and`, `: -> -`, double space `  ->  `
   - rendered raw path: `AC/DC/2026/One & Two: Test.mp4`
   - final target path: `AC/DC/2026/One and Two- Test.mp4`

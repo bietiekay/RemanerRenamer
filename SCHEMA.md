@@ -5,11 +5,18 @@ rendered.
 
 ## Placeholders
 
-User placeholders begin with `%` and use this format:
+User placeholders begin with `%`. They can be written in either form:
 
-```regex
-%[A-Za-z][A-Za-z0-9_]*
+```text
+%name
+%{name}
 ```
+
+The placeholder name itself must match `[A-Za-z][A-Za-z0-9_]*`.
+
+Unbraced placeholders keep reading letters, numbers, and underscores until the
+first different character. Use the braced form when the next literal character
+is a letter, number, or underscore.
 
 Valid examples:
 
@@ -18,6 +25,9 @@ Valid examples:
 %title
 %episode_2
 %myCustomThing
+%{a}
+%{title}
+%{episode_2}
 ```
 
 Invalid examples:
@@ -27,10 +37,27 @@ Invalid examples:
 %1
 %-
 % title
+%{}
+%{1}
+%{title
 ```
 
 Placeholder names have no built-in meaning. `%y` is not automatically a year,
 and `%title` is not automatically a title.
+
+For example, this schema uses braces so the literal `__`, `_E`, and `E` are not
+mistaken for parts of placeholder names:
+
+```text
+Filename: Mittendrin_-_Flughafen_Frankfurt-100_Jahre_Lufthansa__Propeller,_Piloten_und_Pillbox__(S16_E05)-0168821512.mp4
+Input:    %{title}__(S%{season}_E%{episode})%{id}
+Output:   S%{season}E%{episode}.@ext
+Result:   S16E05.mp4
+```
+
+Without braces, a placeholder named `season` followed by `E` would be written
+as `%seasonE`, which means one placeholder named `seasonE`, not `%season` plus
+a literal `E`.
 
 ## Literal Percent Signs
 
@@ -56,6 +83,14 @@ Output schemas can use system variables:
 @filename  original full filename
 ```
 
+System variables can also be delimited with braces:
+
+```text
+@{ext}
+@{basename}
+@{filename}
+```
+
 `@n` is reserved for future conflict numbering and is not available in v1.
 
 ## Extension Modes
@@ -65,15 +100,15 @@ only, and the output schema should include `@ext` when the extension should be
 kept:
 
 ```text
-Input:  %a-%b-%c - %title - %suffix
-Output: %c%b%a - %title.@ext
+Input:  %{a}-%{b}-%{c} - %{title} - %{suffix}
+Output: %{c}%{b}%{a} - %{title}.@ext
 ```
 
 Full filename mode matches the complete filename, including extension:
 
 ```text
-Input:  %a-%b-%c - %title.mp4
-Output: %title - %a-%b-%c.mp4
+Input:  %{a}-%{b}-%{c} - %{title}.mp4
+Output: %{title} - %{a}-%{b}-%{c}.mp4
 ```
 
 ## Folder Output
@@ -82,13 +117,13 @@ Output schemas may include `/` separators to create a relative folder structure
 from captured placeholders and system variables.
 
 ```text
-Input:  %a-%b-%d - %t
-Output: %a/%d/%t.@ext
+Input:  %{a}-%{b}-%{d} - %{t}
+Output: %{a}/%{d}/%{t}.@ext
 ```
 
-The generated script writes `%t.@ext` into the folder `%d` under the folder
-`%a`, relative to the selected folder. Missing folders are created by the script
-when it runs with `--force`.
+The generated script writes `%{t}.@ext` into the folder `%{d}` under the folder
+`%{a}`, relative to the selected folder. Missing folders are created by the
+script when it runs with `--force`.
 
 Folder output is transparent: no separate toggle is needed. It activates when
 the rendered output path contains `/`.
@@ -135,7 +170,7 @@ value are invalid.
 
 ## Limits
 
-- Adjacent input placeholders such as `%a%b` are blocked because the split point
-  is ambiguous.
+- Adjacent input placeholders such as `%a%b` or `%{a}%{b}` are blocked because
+  the capture split point is ambiguous.
 - Repeated placeholders are allowed only when repeated captures are identical.
 - Recursive folder renaming is deferred.

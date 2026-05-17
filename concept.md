@@ -398,11 +398,21 @@ They are user-defined capture groups.
 
 Placeholders begin with `%`.
 
-Recommended valid placeholder format:
+Supported placeholder forms:
+
+```text
+%name
+%{name}
+```
+
+The placeholder name itself should match:
 
 ```regex
-%[A-Za-z][A-Za-z0-9_]*
+[A-Za-z][A-Za-z0-9_]*
 ```
+
+The braced form is useful when the next literal character is a letter, number,
+or underscore.
 
 ### 13.2 Valid examples
 
@@ -414,6 +424,9 @@ Recommended valid placeholder format:
 %date
 %episode_2
 %myCustomThing
+%{a}
+%{title}
+%{episode_2}
 ```
 
 ### 13.3 Invalid examples
@@ -423,6 +436,9 @@ Recommended valid placeholder format:
 %1
 %-
 % title
+%{}
+%{1}
+%{title
 ```
 
 ### 13.4 Escaping literal percent signs
@@ -464,6 +480,9 @@ Recommended system variables:
 @n          Conflict counter, only available when conflict numbering is enabled
 ```
 
+Delimited system-variable syntax such as `@{ext}` is also supported where an
+explicit boundary is helpful.
+
 Important:
 
 ```text
@@ -487,7 +506,7 @@ The input schema includes the extension.
 Example:
 
 ```text
-%a-%b-%c - %title.mp4
+%{a}-%{b}-%{c} - %{title}.mp4
 ```
 
 In this mode, `.mp4` is treated as literal text.
@@ -505,13 +524,13 @@ Example filename:
 Input schema:
 
 ```text
-%a-%b-%c - %title - %suffix
+%{a}-%{b}-%{c} - %{title} - %{suffix}
 ```
 
 Output schema:
 
 ```text
-%c%b%a - %title.@ext
+%{c}%{b}%{a} - %{title}.@ext
 ```
 
 Result:
@@ -569,7 +588,7 @@ Internally, both input and output schemas should be parsed into tokens.
 ### 16.2 Example input schema
 
 ```text
-%a-%b-%c - %title - %suffix
+%{a}-%{b}-%{c} - %{title} - %{suffix}
 ```
 
 ### 16.3 Tokenized form
@@ -605,7 +624,7 @@ Input filename:
 Input schema:
 
 ```text
-%a-%b-%c - %title - %suffix
+%{a}-%{b}-%{c} - %{title} - %{suffix}
 ```
 
 Result:
@@ -625,7 +644,7 @@ Literal text in the schema acts as an anchor.
 In this schema:
 
 ```text
-%a-%b-%c - %title - %suffix
+%{a}-%{b}-%{c} - %{title} - %{suffix}
 ```
 
 The literals are:
@@ -646,7 +665,7 @@ Placeholder matching should be non-greedy where possible.
 Example schema:
 
 ```text
-%a - %b - %c
+%{a} - %{b} - %{c}
 ```
 
 Filename:
@@ -671,6 +690,7 @@ Example:
 
 ```text
 %a%b
+%{a}%{b}
 ```
 
 Filename:
@@ -687,7 +707,14 @@ Recommended v1 behavior:
 Block adjacent placeholders.
 ```
 
-Future enhancement:
+Delimited placeholders solve literal-boundary ambiguity, not capture-boundary
+ambiguity. This is valid because `_E` is a literal anchor between captures:
+
+```text
+%{title}__(S%{season}_E%{episode})%{id}
+```
+
+Future enhancement for adjacent captures:
 
 ```text
 %a{4}%b{2}
@@ -753,7 +780,7 @@ Captured values:
 Output schema:
 
 ```text
-%c%b%a - %title.@ext
+%{c}%{b}%{a} - %{title}.@ext
 ```
 
 Result:
@@ -769,13 +796,13 @@ If the output schema references a placeholder not present in the input schema, v
 Example input schema:
 
 ```text
-%a-%b-%c - %title
+%{a}-%{b}-%{c} - %{title}
 ```
 
 Output schema:
 
 ```text
-%c%b%a - %artist.@ext
+%{c}%{b}%{a} - %{artist}.@ext
 ```
 
 Error:
@@ -1350,7 +1377,7 @@ Optionally write a local operation log.
 │ 142 files loaded                                           │
 ├────────────────────────────────────────────────────────────┤
 │ Input Schema                                               │
-│ [%a-%b-%c - %title - %suffix]                              │
+│ [%{a}-%{b}-%{c} - %{title} - %{suffix}]                    │
 │ Extension handling: [Preserve extension v]                 │
 │                                                            │
 │ Example file                                               │
@@ -1364,7 +1391,7 @@ Optionally write a local operation log.
 │ %suffix  Test                                              │
 ├────────────────────────────────────────────────────────────┤
 │ Output Schema                                              │
-│ [%c%b%a - %title.@ext]                                     │
+│ [%{c}%{b}%{a} - %{title}.@ext]                             │
 │ Conflict behavior: [Block v]                               │
 ├────────────────────────────────────────────────────────────┤
 │ Preview                                                    │
@@ -1703,7 +1730,7 @@ Acceptance criteria:
 
 ```text
 Filename "2026-05-01 - Das ist ein - Test.mp4"
-Input schema "%a-%b-%c - %title - %suffix"
+Input schema "%{a}-%{b}-%{c} - %{title} - %{suffix}"
 Preserve extension mode
 Extracts:
 a=2026
@@ -2050,10 +2077,12 @@ It should let the user select a local folder using a browser file input with web
 
 Important behavior:
 - Placeholder names are fully user-defined.
+- Placeholders can use `%name` or `%{name}` syntax; braces explicitly delimit
+  the name from following literal text.
 - The app must not attach semantic meaning to names like %y, %m, %d, or %title.
 - Any placeholder declared in the input schema becomes available in the output schema.
 - The output schema must fail validation if it references a placeholder not present in the input schema.
-- Built-in/system variables must use @name, not %name, to avoid conflicts with user-defined placeholders.
+- Built-in/system variables must use @name or @{name}, not %name, to avoid conflicts with user-defined placeholders.
 - Suggested system variables:
   - @ext: original extension without dot
   - @basename: original filename without extension
@@ -2194,7 +2223,7 @@ Should output schemas be allowed to create folders?
 Example:
 
 ```text
-%a/%b/%title.@ext
+%{a}/%{b}/%{title}.@ext
 ```
 
 Recommended v1:
@@ -2235,16 +2264,16 @@ Potential presets:
 
 ```text
 Date Title Suffix:
-Input:  %a-%b-%c - %title - %suffix
-Output: %c%b%a - %title.@ext
+Input:  %{a}-%{b}-%{c} - %{title} - %{suffix}
+Output: %{c}%{b}%{a} - %{title}.@ext
 
 Simple Title Suffix:
-Input:  %title - %suffix
-Output: %title.@ext
+Input:  %{title} - %{suffix}
+Output: %{title}.@ext
 
 Three-Part Name:
-Input:  %a - %b - %c
-Output: %c - %a - %b.@ext
+Input:  %{a} - %{b} - %{c}
+Output: %{c} - %{a} - %{b}.@ext
 ```
 
 ---

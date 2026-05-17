@@ -8,8 +8,8 @@ Current repo state: only `concept.md`, `LICENSE.md`, `.DS_Store`, and git metada
 ## Key Decisions
 - App type: static web app, no backend, no Electron/Tauri, no browser write APIs.
 - App name: use **Schema Rename Script Generator** in v1 UI; repo/package identity can remain `RemanerRenamer`.
-- Placeholder syntax: `%[A-Za-z][A-Za-z0-9_]*`; `%%` means literal `%`.
-- System variables: `@ext`, `@basename`, `@filename`; reserve `@n` for later/auto-numbering behavior.
+- Placeholder syntax: `%name` and `%{name}` where names match `[A-Za-z][A-Za-z0-9_]*`; `%%` means literal `%`.
+- System variables: `@ext`, `@basename`, `@filename`, plus delimited `@{ext}` style; reserve `@n` for later/auto-numbering behavior.
 - Extension mode: default to `preserve`; provide `full filename` as an advanced option.
 - v1 scope: non-recursive rename plans only, no subfolder output, no direct file moves.
 - Conflict behavior: default `block`; include auto-number only if it can be implemented without weakening validation.
@@ -50,7 +50,7 @@ Current repo state: only `concept.md`, `LICENSE.md`, `.DS_Store`, and git metada
 
 ## Test Plan
 - Add focused manual and lightweight automated checks for pure logic where practical.
-- Cover schema parsing: valid placeholders, invalid placeholders, escaped `%`, adjacent placeholder blocking, repeated placeholders.
+- Cover schema parsing: valid placeholders, delimited placeholders, invalid placeholders, escaped `%`, adjacent placeholder blocking, repeated placeholders.
 - Cover matching/rendering: preserve extension mode, full filename mode, unknown output placeholders, system variables.
 - Cover validation: invalid filename characters, empty output, reserved names, trailing spaces/dots, duplicate outputs, overwrite risks, case-only conflicts, source-target swaps.
 - Cover script generation: dry-run default, `--force` only apply mode, safe quoting for spaces/single quotes/leading dashes, temporary rename strategy.
@@ -60,8 +60,8 @@ Current repo state: only `concept.md`, `LICENSE.md`, `.DS_Store`, and git metada
 - The app opens without a build step.
 - A selected folder produces a visible file list and rename preview.
 - The example from `concept.md` works:
-  - input `%a-%b-%c - %title - %suffix`
-  - output `%c%b%a - %title.@ext`
+  - input `%{a}-%{b}-%{c} - %{title} - %{suffix}`
+  - output `%{c}%{b}%{a} - %{title}.@ext`
   - result `01052026 - Das ist ein.mp4`
 - Unsafe or ambiguous plans block script generation.
 - Generated `rename.sh` is readable, copyable, downloadable, and dry-runs by default.

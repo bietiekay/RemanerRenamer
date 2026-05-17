@@ -3,6 +3,9 @@
 ## [Unreleased]
 
 ### Added
+- Delimited placeholder syntax with `%{name}` and delimited system variables
+  with `@{name}` for schemas where the next literal starts with a letter,
+  number, or underscore.
 - In-app and documented privacy notice that filenames are handled locally in the
   browser and no data is uploaded to, processed by, or stored on a server.
 - Browser-saved replacement rules that run after output rendering and before

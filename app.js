@@ -17,8 +17,8 @@
     "preview.title": "Preview"
   };
 
-  const DEFAULT_INPUT_SCHEMA = "%a-%b-%c - %title - %suffix";
-  const DEFAULT_OUTPUT_SCHEMA = "%c%b%a - %title.@ext";
+  const DEFAULT_INPUT_SCHEMA = "%{a}-%{b}-%{c} - %{title} - %{suffix}";
+  const DEFAULT_OUTPUT_SCHEMA = "%{c}%{b}%{a} - %{title}.@ext";
   const REPLACEMENT_STORAGE_KEY = "remanerRenamer.replacements.v1";
   const SUPPORTED_SYSTEM_VARIABLES = new Set(["ext", "basename", "filename"]);
   const RESERVED_SYSTEM_VARIABLES = new Set(["n"]);
@@ -147,9 +147,32 @@
         }
 
         const remaining = source.slice(index);
+        if (source[index + 1] === "{") {
+          const closeIndex = source.indexOf("}", index + 2);
+          if (closeIndex === -1) {
+            errors.push(`Invalid placeholder near "${remaining.slice(0, 12)}". Use %name or %{name}.`);
+            pushLiteral(tokens, char);
+            index += 1;
+            continue;
+          }
+
+          const name = source.slice(index + 2, closeIndex);
+          if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(name)) {
+            errors.push(`Invalid placeholder name "%{${name}}". Use %[A-Za-z][A-Za-z0-9_]* or %{[A-Za-z][A-Za-z0-9_]*}.`);
+            pushLiteral(tokens, source.slice(index, closeIndex + 1));
+            index = closeIndex + 1;
+            continue;
+          }
+
+          tokens.push({ type: "placeholder", name });
+          placeholders.push(name);
+          index = closeIndex + 1;
+          continue;
+        }
+
         const match = remaining.match(/^%[A-Za-z][A-Za-z0-9_]*/);
         if (!match) {
-          errors.push(`Invalid placeholder near "${remaining.slice(0, 12)}". Use %[A-Za-z][A-Za-z0-9_]*.`);
+          errors.push(`Invalid placeholder near "${remaining.slice(0, 12)}". Use %name or %{name}.`);
           pushLiteral(tokens, char);
           index += 1;
           continue;
@@ -164,9 +187,32 @@
 
       if (char === "@" && allowSystemVariables) {
         const remaining = source.slice(index);
+        if (source[index + 1] === "{") {
+          const closeIndex = source.indexOf("}", index + 2);
+          if (closeIndex === -1) {
+            errors.push(`Invalid system variable near "${remaining.slice(0, 12)}". Use @name or @{name}.`);
+            pushLiteral(tokens, char);
+            index += 1;
+            continue;
+          }
+
+          const name = source.slice(index + 2, closeIndex);
+          if (!/^[A-Za-z][A-Za-z0-9_]*$/.test(name)) {
+            errors.push(`Invalid system variable name "@{${name}}". Use @[A-Za-z][A-Za-z0-9_]* or @{[A-Za-z][A-Za-z0-9_]*}.`);
+            pushLiteral(tokens, source.slice(index, closeIndex + 1));
+            index = closeIndex + 1;
+            continue;
+          }
+
+          tokens.push({ type: "systemVariable", name });
+          systemVariables.push(name);
+          index = closeIndex + 1;
+          continue;
+        }
+
         const match = remaining.match(/^@[A-Za-z][A-Za-z0-9_]*/);
         if (!match) {
-          errors.push(`Invalid system variable near "${remaining.slice(0, 12)}".`);
+          errors.push(`Invalid system variable near "${remaining.slice(0, 12)}". Use @name or @{name}.`);
           pushLiteral(tokens, char);
           index += 1;
           continue;
