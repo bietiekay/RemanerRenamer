@@ -35,6 +35,10 @@ The repository also includes a helper script for the same local server:
 7. Run the script once without `--force`.
 8. Run it again with `--force` only after reviewing the dry run.
 
+The browser remembers the input schema, output schema, and replacement rules on
+the same device. Use the syntax guide link in the app for an in-place reference
+with examples.
+
 ```bash
 cd "/path/to/your/folder"
 bash rename.sh

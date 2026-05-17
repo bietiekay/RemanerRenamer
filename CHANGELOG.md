@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Added
+- In-app syntax guide modal with examples for placeholders, extension modes,
+  folder output, and replacement rules.
+- Browser-saved input and output schemas in addition to existing replacement
+  rule persistence.
 - Delimited placeholder syntax with `%{name}` and delimited system variables
   with `@{name}` for schemas where the next literal starts with a letter,
   number, or underscore.

@@ -19,6 +19,7 @@
 
   const DEFAULT_INPUT_SCHEMA = "%{a}-%{b}-%{c} - %{title} - %{suffix}";
   const DEFAULT_OUTPUT_SCHEMA = "%{c}%{b}%{a} - %{title}.@ext";
+  const SCHEMA_STORAGE_KEY = "remanerRenamer.schemas.v1";
   const REPLACEMENT_STORAGE_KEY = "remanerRenamer.replacements.v1";
   const SUPPORTED_SYSTEM_VARIABLES = new Set(["ext", "basename", "filename"]);
   const RESERVED_SYSTEM_VARIABLES = new Set(["n"]);
@@ -1012,6 +1013,36 @@ echo "Done."
     }
   }
 
+  function loadStoredSchemas(storage, defaults = {}) {
+    const fallback = {
+      inputSchema: defaults.inputSchema || DEFAULT_INPUT_SCHEMA,
+      outputSchema: defaults.outputSchema || DEFAULT_OUTPUT_SCHEMA
+    };
+    if (!storage) return fallback;
+
+    try {
+      const stored = JSON.parse(storage.getItem(SCHEMA_STORAGE_KEY) || "{}");
+      return {
+        inputSchema: typeof stored.inputSchema === "string" ? stored.inputSchema : fallback.inputSchema,
+        outputSchema: typeof stored.outputSchema === "string" ? stored.outputSchema : fallback.outputSchema
+      };
+    } catch (error) {
+      return fallback;
+    }
+  }
+
+  function saveStoredSchemas(storage, schemas) {
+    if (!storage) return;
+    try {
+      storage.setItem(SCHEMA_STORAGE_KEY, JSON.stringify({
+        inputSchema: String(schemas.inputSchema || ""),
+        outputSchema: String(schemas.outputSchema || "")
+      }));
+    } catch (error) {
+      // Ignore storage errors; schemas still work for the current session.
+    }
+  }
+
   function getLocalStorage(doc) {
     try {
       return doc.defaultView ? doc.defaultView.localStorage : null;
@@ -1022,11 +1053,12 @@ echo "Done."
 
   function initApp(doc) {
     const storage = getLocalStorage(doc);
+    const storedSchemas = loadStoredSchemas(storage);
     const state = {
       files: [],
       ignoredNestedCount: 0,
-      inputSchema: DEFAULT_INPUT_SCHEMA,
-      outputSchema: DEFAULT_OUTPUT_SCHEMA,
+      inputSchema: storedSchemas.inputSchema,
+      outputSchema: storedSchemas.outputSchema,
       extensionMode: "preserve",
       caseSensitivity: "insensitive",
       replacements: loadReplacementRules(storage),
@@ -1041,6 +1073,9 @@ echo "Done."
       headerStatus: doc.getElementById("headerStatus"),
       inputSchema: doc.getElementById("inputSchema"),
       outputSchema: doc.getElementById("outputSchema"),
+      syntaxHelpLink: doc.getElementById("syntaxHelpLink"),
+      syntaxHelpModal: doc.getElementById("syntaxHelpModal"),
+      syntaxHelpCloseButton: doc.getElementById("syntaxHelpCloseButton"),
       extensionMode: doc.getElementById("extensionMode"),
       caseSensitivity: doc.getElementById("caseSensitivity"),
       schemaMessages: doc.getElementById("schemaMessages"),
@@ -1082,6 +1117,25 @@ echo "Done."
     function clearGeneratedScript() {
       state.lastScript = "";
       els.scriptPreview.value = "";
+    }
+
+    function persistSchemas() {
+      saveStoredSchemas(storage, {
+        inputSchema: state.inputSchema,
+        outputSchema: state.outputSchema
+      });
+    }
+
+    function openSyntaxHelp() {
+      els.syntaxHelpModal.hidden = false;
+      doc.body.classList.add("modal-open");
+      els.syntaxHelpCloseButton.focus();
+    }
+
+    function closeSyntaxHelp() {
+      els.syntaxHelpModal.hidden = true;
+      doc.body.classList.remove("modal-open");
+      els.syntaxHelpLink.focus();
     }
 
     function renderMessages(plan) {
@@ -1372,14 +1426,37 @@ echo "Done."
 
     els.inputSchema.addEventListener("input", () => {
       state.inputSchema = els.inputSchema.value;
+      persistSchemas();
       clearGeneratedScript();
       render();
     });
 
     els.outputSchema.addEventListener("input", () => {
       state.outputSchema = els.outputSchema.value;
+      persistSchemas();
       clearGeneratedScript();
       render();
+    });
+
+    els.syntaxHelpLink.addEventListener("click", (event) => {
+      event.preventDefault();
+      openSyntaxHelp();
+    });
+
+    els.syntaxHelpCloseButton.addEventListener("click", () => {
+      closeSyntaxHelp();
+    });
+
+    els.syntaxHelpModal.addEventListener("click", (event) => {
+      if (event.target === els.syntaxHelpModal) {
+        closeSyntaxHelp();
+      }
+    });
+
+    doc.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !els.syntaxHelpModal.hidden) {
+        closeSyntaxHelp();
+      }
     });
 
     els.extensionMode.addEventListener("change", () => {
@@ -1459,6 +1536,8 @@ echo "Done."
     validateTargetPath,
     applyReplacementRulesToSegment,
     applyReplacementRulesToTargetPath,
+    loadStoredSchemas,
+    saveStoredSchemas,
     matchFilename,
     renderOutput
   };

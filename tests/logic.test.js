@@ -7,12 +7,26 @@ const {
   createFileEntryFromName,
   createRenamePlan,
   generateRenameScript,
+  loadStoredSchemas,
+  saveStoredSchemas,
   shellQuote,
   tokenizeSchema,
   validateFilename,
   validateReplacementRules,
   validateTargetPath
 } = require("../app.js");
+
+function createMemoryStorage() {
+  const values = new Map();
+  return {
+    getItem(key) {
+      return values.has(key) ? values.get(key) : null;
+    },
+    setItem(key, value) {
+      values.set(key, String(value));
+    }
+  };
+}
 
 function planFor(names, options = {}) {
   return createRenamePlan({
@@ -84,6 +98,30 @@ function planFor(names, options = {}) {
     blockAdjacentPlaceholders: true
   });
   assert.equal(parsed.errors.length, 1);
+}
+
+{
+  const storage = createMemoryStorage();
+  saveStoredSchemas(storage, {
+    inputSchema: "%{title}",
+    outputSchema: "%{title}.@ext"
+  });
+  assert.deepEqual(loadStoredSchemas(storage), {
+    inputSchema: "%{title}",
+    outputSchema: "%{title}.@ext"
+  });
+}
+
+{
+  const storage = createMemoryStorage();
+  saveStoredSchemas(storage, {
+    inputSchema: "",
+    outputSchema: ""
+  });
+  assert.deepEqual(loadStoredSchemas(storage), {
+    inputSchema: "",
+    outputSchema: ""
+  });
 }
 
 {

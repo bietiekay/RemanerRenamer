@@ -38,6 +38,7 @@
         <div class="tool-section">
           <div class="section-heading">
             <h2 data-i18n="schema.input.title">Input schema</h2>
+            <a id="syntaxHelpLink" class="text-link" href="#syntaxHelpModal">Syntax guide</a>
           </div>
           <label class="field-label" for="inputSchema" data-i18n="schema.input.label">Existing filename pattern</label>
           <input id="inputSchema" class="text-input" type="text" autocomplete="off" spellcheck="false">
@@ -142,6 +143,75 @@
         </div>
       </section>
     </main>
+
+    <div id="syntaxHelpModal" class="modal-backdrop" hidden>
+      <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="syntaxHelpTitle">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">Syntax</p>
+            <h2 id="syntaxHelpTitle">Schema guide</h2>
+          </div>
+          <button id="syntaxHelpCloseButton" class="button secondary-button" type="button">Close</button>
+        </div>
+
+        <div class="modal-body">
+          <section class="syntax-section">
+            <h3>Placeholders</h3>
+            <p>Placeholders capture parts of the current filename and can be reused in the output schema.</p>
+            <pre><code>%name
+%{name}</code></pre>
+            <p>Use braces when a placeholder touches literal letters, numbers, or underscores.</p>
+            <pre><code>Input:  %{title}__(S%{season}_E%{episode})%{id}
+Output: S%{season}E%{episode}.@ext
+Result: S16E05.mp4</code></pre>
+          </section>
+
+          <section class="syntax-section">
+            <h3>Literal text</h3>
+            <p>Text outside placeholders must appear exactly in the matched filename.</p>
+            <pre><code>Filename: 2026-05-01 - Das ist ein - Test.mp4
+Input:    %{year}-%{month}-%{day} - %{title} - %{suffix}
+Output:   %{day}%{month}%{year} - %{title}.@ext
+Result:   01052026 - Das ist ein.mp4</code></pre>
+            <p>Use <code>%%</code> for a literal percent sign.</p>
+          </section>
+
+          <section class="syntax-section">
+            <h3>System variables</h3>
+            <p>System variables are available in output schemas.</p>
+            <pre><code>@ext        original extension without dot
+@basename   original filename without extension
+@filename   original full filename</code></pre>
+            <p>They can also be written with braces, such as <code>@{ext}</code>.</p>
+          </section>
+
+          <section class="syntax-section">
+            <h3>Extension modes</h3>
+            <p>Preserve extension mode matches only the basename. Include <code>@ext</code> in the output to keep the extension.</p>
+            <pre><code>Input:  %{title}
+Output: %{title} - cleaned.@ext</code></pre>
+            <p>Full filename mode matches the complete filename, including the extension.</p>
+            <pre><code>Input:  %{title}.%{year}.mp4
+Output: %{year} - %{title}.@ext</code></pre>
+          </section>
+
+          <section class="syntax-section">
+            <h3>Folders and replacements</h3>
+            <p>A slash in the output schema creates a relative folder path. Replacement rules run after the output schema, one path segment at a time.</p>
+            <pre><code>Output: %{year}/%{title}.@ext
+
+Rule:   : -> -
+Before: 2026/Song: Part.mp4
+After:  2026/Song- Part.mp4</code></pre>
+          </section>
+
+          <section class="syntax-section">
+            <h3>Limits</h3>
+            <p>Adjacent placeholders such as <code>%{a}%{b}</code> are blocked because the split point is ambiguous. Repeated placeholders are allowed only when every capture has the same value.</p>
+          </section>
+        </div>
+      </section>
+    </div>
 
     <script src="app.js"></script>
   </body>

@@ -10,6 +10,9 @@ filesystem write access and does not rename files directly.
 No file contents or rename data are uploaded to a server, processed remotely, or
 stored on a server. The app handles filenames locally in the browser.
 
+Input schemas, output schemas, and replacement rules may be saved in browser
+storage on the same device for convenience.
+
 The browser usually does not expose the selected folder's absolute path, so the
 generated script uses relative filenames and assumes it is run from the target
 folder.
